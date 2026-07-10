@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Renal findings in a discharge summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["aki_status", "ckd_stage", "evidence", "confidence"],
+  "properties": {
+    "aki_status": {
+      "type": "string",
+      "enum": ["absent", "present_on_admission", "hospital_acquired", "present_timing_unclear", "historical"],
+      "description": "Use an AKI-positive value only when acute kidney injury or an unambiguous synonym is explicitly documented."
+    },
+    "ckd_stage": {
+      "type": "string",
+      "enum": ["not_documented", "1", "2", "3", "3a", "3b", "4", "5", "documented_stage_unknown"],
+      "description": "Extract only an explicitly documented CKD stage; ESRD maps to stage 5."
+    },
+    "evidence": {
+      "type": "string",
+      "description": "A short exact quote supporting the renal finding, or an empty string when absent."
+    },
+    "confidence": {"type": "string", "enum": ["low", "medium", "high"]}
+  }
+}
+

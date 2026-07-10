@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Renal findings in a nephrology note",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reason_for_consult", "aki", "aki_stage", "ckd_stage", "dialysis_status",
+    "renal_transplant", "baseline_creatinine", "current_creatinine", "egfr",
+    "primary_renal_diagnosis", "recommendations", "evidence", "confidence"
+  ],
+  "properties": {
+    "reason_for_consult": {
+      "type": "string",
+      "enum": ["aki", "ckd", "electrolyte", "acid_base", "hypertension", "proteinuria", "hematuria", "dialysis_management", "transplant", "glomerulonephritis", "kidney_stones", "other", "unclear"]
+    },
+    "aki": {"type": "string", "enum": ["absent", "active", "historical_or_resolved", "suspected"]},
+    "aki_stage": {"type": "string", "enum": ["not_documented", "1", "2", "3"]},
+    "ckd_stage": {"type": "string", "enum": ["not_documented", "1", "2", "3", "3a", "3b", "4", "5", "documented_stage_unknown"]},
+    "dialysis_status": {"type": "string", "enum": ["none", "hemodialysis", "peritoneal", "crrt", "planned", "historical", "unclear"]},
+    "renal_transplant": {"type": "string", "enum": ["none", "functioning", "failing", "historical", "unclear"]},
+    "baseline_creatinine": {"type": ["number", "null"], "description": "mg/dL, or null when not stated"},
+    "current_creatinine": {"type": ["number", "null"], "description": "mg/dL, or null when not stated"},
+    "egfr": {"type": ["number", "null"], "description": "mL/min/1.73m2, or null when not stated"},
+    "primary_renal_diagnosis": {"type": "string"},
+    "recommendations": {"type": "string"},
+    "evidence": {"type": "string", "description": "Short exact quote supporting the primary finding"},
+    "confidence": {"type": "string", "enum": ["low", "medium", "high"]}
+  }
+}
+
