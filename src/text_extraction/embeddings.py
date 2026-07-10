@@ -9,7 +9,7 @@ from typing import Any, Iterable
 
 import numpy as np
 
-from .io import read_jsonl
+from .io import iter_records
 
 
 def masked_mean(last_hidden_state: Any, attention_mask: Any) -> Any:
@@ -113,9 +113,6 @@ class TransformerEmbedder:
 
 
 def run(args: argparse.Namespace) -> None:
-    records = read_jsonl(args.input)
-    ids = np.asarray([str(row.get(args.id_field, i)) for i, row in enumerate(records)])
-    texts = [str(row.get(args.text_field, "")) for row in records]
     embedder = TransformerEmbedder(
         args.model,
         pooling=args.pooling,
@@ -124,15 +121,46 @@ def run(args: argparse.Namespace) -> None:
         trust_remote_code=args.trust_remote_code,
         device=args.device,
     )
-    if args.chunk_tokens:
-        embeddings = embedder.encode_long(
-            texts,
-            batch_size=args.batch_size,
-            chunk_tokens=args.chunk_tokens,
-            chunk_overlap=args.chunk_overlap,
+    ids_list: list[str] = []
+    vector_batches: list[np.ndarray] = []
+    record_batch: list[tuple[str, str]] = []
+
+    def encode_batch(batch: list[tuple[str, str]]) -> None:
+        if not batch:
+            return
+        ids_list.extend(item[0] for item in batch)
+        texts = [item[1] for item in batch]
+        if args.chunk_tokens:
+            vectors = embedder.encode_long(
+                texts,
+                batch_size=args.batch_size,
+                chunk_tokens=args.chunk_tokens,
+                chunk_overlap=args.chunk_overlap,
+            )
+        else:
+            vectors = embedder.encode(texts, batch_size=args.batch_size)
+        vector_batches.append(vectors)
+
+    records = iter_records(
+        args.input,
+        input_format=args.input_format,
+        limit=args.limit,
+    )
+    for index, row in enumerate(records):
+        record_batch.append(
+            (str(row.get(args.id_field, index)), str(row.get(args.text_field, "")))
         )
+        if len(record_batch) >= args.batch_size:
+            encode_batch(record_batch)
+            record_batch = []
+    encode_batch(record_batch)
+
+    ids = np.asarray(ids_list)
+    if vector_batches:
+        embeddings = np.concatenate(vector_batches).astype(np.float32, copy=False)
     else:
-        embeddings = embedder.encode(texts, batch_size=args.batch_size)
+        hidden_size = int(getattr(embedder.model.config, "hidden_size", 0))
+        embeddings = np.empty((0, hidden_size), dtype=np.float32)
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     metadata = json.dumps(
@@ -157,11 +185,15 @@ def run(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", required=True, help="Input JSONL")
+    parser.add_argument("--input", required=True, help="Input JSONL or CSV")
     parser.add_argument("--output", required=True, help="Output .npz")
     parser.add_argument("--model", required=True, help="Hugging Face model ID or local path")
     parser.add_argument("--text-field", default="text")
     parser.add_argument("--id-field", default="note_id")
+    parser.add_argument(
+        "--input-format", choices=["auto", "csv", "jsonl"], default="auto"
+    )
+    parser.add_argument("--limit", type=int, help="Process only the first N input rows")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--pooling", choices=["mean", "cls"], default="mean")
     parser.add_argument("--max-length", type=int)

@@ -59,8 +59,8 @@ CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH="$CONDA_PREFIX/lib" \
 
 ## 1. Structured JSON extraction
 
-Input is JSONL. Each line must contain a text field and may contain any metadata
-you want copied to the output.
+Input can be JSONL or CSV. JSONL lines must contain a text field and may contain
+any metadata you want copied to the output.
 
 ```json
 {"note_id":"n1","text":"Discharge summary: ..."}
@@ -87,6 +87,53 @@ clear instructions for negation, timing, missing values, and allowed inference.
 
 To add another report type, create a standard JSON Schema. No Python changes
 are needed. `schemas/nephrology_renal.json` is a second example.
+
+### Run the existing discharge and nephrology reports
+
+Four convenience scripts point to the current `/orange` report files and write
+artifacts under the Git-ignored `outputs/` directory:
+
+```bash
+# vLLM server must already be running
+scripts/run_discharge_structured.sh
+scripts/run_nephrology_structured.sh
+
+# Dense vectors on GPU 0
+scripts/run_discharge_embeddings.sh
+scripts/run_nephrology_embeddings.sh
+```
+
+Use `--limit` for a smoke test before a full run:
+
+```bash
+scripts/run_discharge_structured.sh --limit 2 --no-resume
+scripts/run_nephrology_embeddings.sh --limit 2
+```
+
+Configuration is available through environment variables without editing a
+script. For example:
+
+```bash
+WORKERS=16 OUTPUT=/orange/path/to/discharge.jsonl \
+  scripts/run_discharge_structured.sh
+
+MODEL=UFNLP/gatortron-base BATCH_SIZE=16 CUDA_VISIBLE_DEVICES=0 \
+  scripts/run_nephrology_embeddings.sh
+```
+
+The defaults are:
+
+| Script group | Input | Output |
+|---|---|---|
+| Discharge structured | `/orange/pinaki.sarder/singletarya/mmai/text_fe/discharge_summaries.csv` | `outputs/discharge_structured.jsonl` |
+| Nephrology structured | `/orange/pinaki.sarder/kirill.luka/mmai/text_fe/nephrology_consults.csv` | `outputs/nephrology_structured.jsonl` |
+| Discharge embeddings | discharge CSV above | `outputs/discharge_embeddings.npz` |
+| Nephrology embeddings | nephrology CSV above | `outputs/nephrology_embeddings.npz` |
+
+The CSV reader streams rows, and structured requests are kept in a bounded
+queue, so the 5 GB discharge CSV is not loaded into memory. The embedding
+pipeline also streams text batches; only the resulting vector matrix is retained
+until the final compressed `.npz` is written.
 
 ## 2. Dense embedding extraction
 

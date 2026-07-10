@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pytest
 
-from text_extraction.io import append_jsonl, read_jsonl, write_jsonl
+from text_extraction.io import append_jsonl, iter_records, read_jsonl, write_jsonl
 from text_extraction.structured import build_user_prompt, load_schema, parse_json_object
 
 
@@ -20,6 +20,13 @@ def test_jsonl_round_trip(tmp_path):
     assert read_jsonl(path) == [{"note_id": "1", "text": "hello"}]
     write_jsonl(path, [{"note_id": "2", "text": "replacement"}])
     assert read_jsonl(path) == [{"note_id": "2", "text": "replacement"}]
+
+
+def test_csv_streaming_and_limit(tmp_path):
+    path = tmp_path / "records.csv"
+    path.write_text("note_id,NOTE_TEXT\n1,first\n2,second\n", encoding="utf-8")
+    rows = list(iter_records(path, limit=1))
+    assert rows == [{"note_id": "1", "NOTE_TEXT": "first"}]
 
 
 def test_example_schema_is_valid():

@@ -6,14 +6,14 @@ import argparse
 import json
 import random
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator
 from openai import OpenAI
 
-from .io import append_jsonl, read_jsonl, write_jsonl
+from .io import append_jsonl, iter_records, read_jsonl, write_jsonl
 
 SYSTEM_PROMPT = (
     "You are a careful clinical information extraction system. Extract only "
@@ -131,7 +131,6 @@ def _record_id(record: dict[str, Any], id_field: str, index: int) -> str:
 
 def run(args: argparse.Namespace) -> None:
     schema = load_schema(args.schema)
-    records = read_jsonl(args.input)
     completed: set[str] = set()
     output_path = Path(args.output)
     if args.resume and output_path.exists():
@@ -156,12 +155,6 @@ def run(args: argparse.Namespace) -> None:
         request_timeout=args.timeout,
     )
 
-    pending: list[tuple[int, dict[str, Any], str]] = []
-    for index, record in enumerate(records):
-        record_id = _record_id(record, args.id_field, index)
-        if record_id not in completed:
-            pending.append((index, record, record_id))
-
     def process(item: tuple[int, dict[str, Any], str]) -> dict[str, Any]:
         _, record, record_id = item
         metadata = {k: v for k, v in record.items() if k != args.text_field}
@@ -174,17 +167,39 @@ def run(args: argparse.Namespace) -> None:
 
     succeeded = 0
     failed = 0
+
+    def save_result(future: Future[dict[str, Any]]) -> None:
+        nonlocal succeeded, failed
+        result = future.result()
+        append_jsonl(output_path, [result])
+        status = "ok" if "error" not in result else "failed"
+        if status == "ok":
+            succeeded += 1
+        else:
+            failed += 1
+        print(f"{result[args.id_field]}: {status}", flush=True)
+
+    max_in_flight = max(args.workers * 2, 1)
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
-        futures = [pool.submit(process, item) for item in pending]
-        for future in as_completed(futures):
-            result = future.result()
-            append_jsonl(output_path, [result])
-            status = "ok" if "error" not in result else "failed"
-            if status == "ok":
-                succeeded += 1
-            else:
-                failed += 1
-            print(f"{result[args.id_field]}: {status}", flush=True)
+        in_flight: set[Future[dict[str, Any]]] = set()
+        records = iter_records(
+            args.input,
+            input_format=args.input_format,
+            limit=args.limit,
+        )
+        for index, record in enumerate(records):
+            record_id = _record_id(record, args.id_field, index)
+            if record_id in completed:
+                continue
+            in_flight.add(pool.submit(process, (index, record, record_id)))
+            if len(in_flight) >= max_in_flight:
+                done, in_flight = wait(in_flight, return_when=FIRST_COMPLETED)
+                for future in done:
+                    save_result(future)
+        while in_flight:
+            done, in_flight = wait(in_flight, return_when=FIRST_COMPLETED)
+            for future in done:
+                save_result(future)
     print(
         f"Completed: {succeeded} succeeded, {failed} failed, "
         f"{len(completed)} skipped",
@@ -196,7 +211,7 @@ def run(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", required=True, help="Input JSONL")
+    parser.add_argument("--input", required=True, help="Input JSONL or CSV")
     parser.add_argument("--output", required=True, help="Output JSONL")
     parser.add_argument("--schema", required=True, help="JSON Schema file")
     parser.add_argument("--model", required=True, help="Model served by vLLM")
@@ -204,6 +219,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--api-key", default="not-required")
     parser.add_argument("--text-field", default="text")
     parser.add_argument("--id-field", default="note_id")
+    parser.add_argument(
+        "--input-format", choices=["auto", "csv", "jsonl"], default="auto"
+    )
+    parser.add_argument("--limit", type=int, help="Process only the first N input rows")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--max-tokens", type=int, default=4096)
     parser.add_argument("--retries", type=int, default=3)
