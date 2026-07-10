@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Renal findings in a discharge summary",
+  "description": "Extract AKI status and CKD stage independently. AKI: use absent when AKI is negated or never explicitly named; present_on_admission only when AKI is documented at admission, on arrival, in the presenting history, or before transfer; hospital_acquired when AKI explicitly develops after admission or during treatment (for example on a hospital day, after contrast, surgery, infection, or diuresis); present_timing_unclear when current-encounter AKI is explicit but timing is unavailable; historical only for remote AKI not active in this encounter. Never infer AKI from creatinine, eGFR, urine output, dialysis, or a nephrology consult. CKD: use not_documented only when CKD is absent or explicitly negated; use documented_stage_unknown when CKD is explicitly documented without a stage; extract 1, 2, 3, 3a, 3b, 4, or 5 only when the note states it; ESRD means stage 5. Evidence must be a short exact quote, not a paraphrase. Evaluate negation, encounter status, and temporal phrases before choosing labels.",
   "type": "object",
   "additionalProperties": false,
   "required": ["aki_status", "ckd_stage", "evidence", "confidence"],
@@ -8,18 +9,17 @@
     "aki_status": {
       "type": "string",
       "enum": ["absent", "present_on_admission", "hospital_acquired", "present_timing_unclear", "historical"],
-      "description": "Use an AKI-positive value only when acute kidney injury or an unambiguous synonym is explicitly documented."
+      "description": "Current encounter AKI timing. A hospital-day or post-treatment onset is hospital_acquired, never present_on_admission. Negated AKI is absent."
     },
     "ckd_stage": {
       "type": "string",
       "enum": ["not_documented", "1", "2", "3", "3a", "3b", "4", "5", "documented_stage_unknown"],
-      "description": "Extract only an explicitly documented CKD stage; ESRD maps to stage 5."
+      "description": "Explicit CKD stage. CKD named without a stage is documented_stage_unknown; no CKD or negated CKD is not_documented; ESRD is 5."
     },
     "evidence": {
       "type": "string",
-      "description": "A short exact quote supporting the renal finding, or an empty string when absent."
+      "description": "A short verbatim quote from the note supporting the selected AKI/CKD labels, or an empty string when neither is documented."
     },
     "confidence": {"type": "string", "enum": ["low", "medium", "high"]}
   }
 }
-

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -85,6 +86,14 @@ class TransformerEmbedder:
     ) -> np.ndarray:
         if chunk_overlap >= chunk_tokens:
             raise ValueError("chunk_overlap must be smaller than chunk_tokens")
+        max_content_tokens = self.max_length - self.tokenizer.num_special_tokens_to_add(
+            pair=False
+        )
+        if chunk_tokens > max_content_tokens:
+            raise ValueError(
+                f"chunk_tokens ({chunk_tokens}) exceeds the model's usable window "
+                f"({max_content_tokens}); lower --chunk-tokens or raise --max-length"
+            )
         document_vectors: list[np.ndarray] = []
         stride = chunk_tokens - chunk_overlap
         for text in texts:
@@ -126,7 +135,23 @@ def run(args: argparse.Namespace) -> None:
         embeddings = embedder.encode(texts, batch_size=args.batch_size)
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(output, embeddings=embeddings, ids=ids)
+    metadata = json.dumps(
+        {
+            "model": args.model,
+            "pooling": args.pooling,
+            "normalized": args.normalize,
+            "max_length": embedder.max_length,
+            "chunk_tokens": args.chunk_tokens,
+            "chunk_overlap": args.chunk_overlap if args.chunk_tokens else None,
+        },
+        sort_keys=True,
+    )
+    np.savez_compressed(
+        output,
+        embeddings=embeddings,
+        ids=ids,
+        metadata=np.asarray(metadata),
+    )
     print(f"Saved {embeddings.shape} embeddings to {output}")
 
 
@@ -154,4 +179,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

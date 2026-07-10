@@ -28,3 +28,10 @@ def append_jsonl(path: str | Path, records: Iterable[dict[str, Any]]) -> None:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
         handle.flush()
 
+
+def write_jsonl(path: str | Path, records: Iterable[dict[str, Any]]) -> None:
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("w", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")

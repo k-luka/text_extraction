@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Renal findings in a nephrology note",
+  "description": "Extract only explicitly documented renal facts. reason_for_consult must match the stated primary consult reason; if the note says consulted for AKI, choose aki. aki is active only for current confirmed AKI, historical_or_resolved only for prior/resolved AKI, suspected only when the clinician explicitly says possible/suspected/risk, and absent when AKI is not documented. Do not infer AKI or an AKI stage from creatinine or eGFR. aki_stage 1/2/3 requires an explicit KDIGO/AKIN stage; otherwise use not_documented. CKD stages require explicit documentation; ESRD is CKD stage 5; CKD named without a stage is documented_stage_unknown. Dialysis and transplant states must follow explicit wording, including failed transplant as failing and prior nonfunctioning transplant as historical. A single current creatinine is not a baseline creatinine; use null unless a baseline/prior value is explicitly labeled. Evidence must be a short exact quote. Never fabricate diagnoses, measurements, or recommendations.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,20 +12,20 @@
   "properties": {
     "reason_for_consult": {
       "type": "string",
-      "enum": ["aki", "ckd", "electrolyte", "acid_base", "hypertension", "proteinuria", "hematuria", "dialysis_management", "transplant", "glomerulonephritis", "kidney_stones", "other", "unclear"]
+      "enum": ["aki", "ckd", "electrolyte", "acid_base", "hypertension", "proteinuria", "hematuria", "dialysis_management", "transplant", "glomerulonephritis", "kidney_stones", "other", "unclear"],
+      "description": "The explicitly stated primary reason nephrology was consulted."
     },
-    "aki": {"type": "string", "enum": ["absent", "active", "historical_or_resolved", "suspected"]},
-    "aki_stage": {"type": "string", "enum": ["not_documented", "1", "2", "3"]},
-    "ckd_stage": {"type": "string", "enum": ["not_documented", "1", "2", "3", "3a", "3b", "4", "5", "documented_stage_unknown"]},
+    "aki": {"type": "string", "enum": ["absent", "active", "historical_or_resolved", "suspected"], "description": "Explicit AKI status; never infer it from renal labs or ESRD."},
+    "aki_stage": {"type": "string", "enum": ["not_documented", "1", "2", "3"], "description": "Only an explicitly stated KDIGO/AKIN AKI stage; otherwise not_documented."},
+    "ckd_stage": {"type": "string", "enum": ["not_documented", "1", "2", "3", "3a", "3b", "4", "5", "documented_stage_unknown"], "description": "Explicit CKD stage; ESRD is 5 and CKD without a stage is documented_stage_unknown."},
     "dialysis_status": {"type": "string", "enum": ["none", "hemodialysis", "peritoneal", "crrt", "planned", "historical", "unclear"]},
-    "renal_transplant": {"type": "string", "enum": ["none", "functioning", "failing", "historical", "unclear"]},
-    "baseline_creatinine": {"type": ["number", "null"], "description": "mg/dL, or null when not stated"},
+    "renal_transplant": {"type": "string", "enum": ["none", "functioning", "failing", "historical", "unclear"], "description": "Explicit transplant status; a failed transplant is failing or historical, not none."},
+    "baseline_creatinine": {"type": ["number", "null"], "description": "Explicitly labeled baseline/prior creatinine in mg/dL, or null; do not copy the current value."},
     "current_creatinine": {"type": ["number", "null"], "description": "mg/dL, or null when not stated"},
     "egfr": {"type": ["number", "null"], "description": "mL/min/1.73m2, or null when not stated"},
     "primary_renal_diagnosis": {"type": "string"},
     "recommendations": {"type": "string"},
-    "evidence": {"type": "string", "description": "Short exact quote supporting the primary finding"},
+    "evidence": {"type": "string", "description": "Short verbatim quote supporting the primary renal finding"},
     "confidence": {"type": "string", "enum": ["low", "medium", "high"]}
   }
 }
-
