@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 MODEL=${MODEL:-google/medgemma-27b-text-it}
 PYTHON_BIN=${PYTHON_BIN:-python}
-WORKERS=${WORKERS:-8}
+WORKERS=${WORKERS:-16}
 STARTUP_TIMEOUT=${STARTUP_TIMEOUT:-300}
 LOG_DIR=${LOG_DIR:-$ROOT/outputs/logs}
 DISCHARGE_OUTPUT=${DISCHARGE_OUTPUT:-$ROOT/outputs/discharge_structured.jsonl}
@@ -13,10 +13,8 @@ NEPHROLOGY_OUTPUT=${NEPHROLOGY_OUTPUT:-$ROOT/outputs/nephrology_structured.jsonl
 mkdir -p "$LOG_DIR"
 
 server_pids=()
-extraction_pids=()
-
 cleanup() {
-  for pid in "${extraction_pids[@]}" "${server_pids[@]}"; do
+  for pid in "${server_pids[@]}"; do
     if [[ -n "$pid" ]]; then
       kill "$pid" 2>/dev/null || true
     fi
@@ -55,22 +53,19 @@ start_server 1 8001
 wait_until_ready 8000 "${server_pids[0]}"
 wait_until_ready 8001 "${server_pids[1]}"
 
-MODEL="$MODEL" PYTHON_BIN="$PYTHON_BIN" WORKERS="$WORKERS" \
-  OUTPUT="$DISCHARGE_OUTPUT" \
-  BASE_URL=http://127.0.0.1:8000/v1 \
-  "$ROOT/scripts/run_discharge_structured.sh" "$@" &
-extraction_pids+=("$!")
-
-MODEL="$MODEL" PYTHON_BIN="$PYTHON_BIN" WORKERS="$WORKERS" \
-  OUTPUT="$NEPHROLOGY_OUTPUT" \
-  BASE_URL=http://127.0.0.1:8001/v1 \
-  "$ROOT/scripts/run_nephrology_structured.sh" "$@" &
-extraction_pids+=("$!")
-
+BASE_URL=http://127.0.0.1:8000/v1,http://127.0.0.1:8001/v1
 status=0
-for pid in "${extraction_pids[@]}"; do
-  if ! wait "$pid"; then
-    status=1
-  fi
-done
+
+if ! MODEL="$MODEL" PYTHON_BIN="$PYTHON_BIN" WORKERS="$WORKERS" \
+  OUTPUT="$DISCHARGE_OUTPUT" BASE_URL="$BASE_URL" \
+  "$ROOT/scripts/run_discharge_structured.sh" "$@"; then
+  status=1
+fi
+
+if ! MODEL="$MODEL" PYTHON_BIN="$PYTHON_BIN" WORKERS="$WORKERS" \
+  OUTPUT="$NEPHROLOGY_OUTPUT" BASE_URL="$BASE_URL" \
+  "$ROOT/scripts/run_nephrology_structured.sh" "$@"; then
+  status=1
+fi
+
 exit "$status"

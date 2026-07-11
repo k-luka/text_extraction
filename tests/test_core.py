@@ -4,7 +4,12 @@ import numpy as np
 import pytest
 
 from text_extraction.io import append_jsonl, iter_records, read_jsonl, write_jsonl
-from text_extraction.structured import build_user_prompt, load_schema, parse_json_object
+from text_extraction.structured import (
+    VLLMStructuredExtractor,
+    build_user_prompt,
+    load_schema,
+    parse_json_object,
+)
 
 
 def test_json_parser_accepts_plain_and_fenced_objects():
@@ -42,3 +47,15 @@ def test_user_prompt_includes_task_rules_and_delimits_note():
     prompt = build_user_prompt("Patient text", schema)
     assert "Do not infer missing values." in prompt
     assert "<clinical_note>\nPatient text\n</clinical_note>" in prompt
+
+
+def test_structured_extractor_round_robins_multiple_endpoints():
+    extractor = VLLMStructuredExtractor(
+        model="test-model",
+        schema={"type": "object"},
+        base_url="http://127.0.0.1:8000/v1, http://127.0.0.1:8001/v1",
+    )
+    assert len(extractor.clients) == 2
+    assert extractor._next_client() is extractor.clients[0]
+    assert extractor._next_client() is extractor.clients[1]
+    assert extractor._next_client() is extractor.clients[0]

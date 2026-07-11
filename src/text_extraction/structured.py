@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from pathlib import Path
@@ -82,9 +83,24 @@ class VLLMStructuredExtractor:
         self.model = model
         self.schema = schema
         self.validator = Draft202012Validator(schema)
-        self.client = OpenAI(base_url=base_url, api_key=api_key, timeout=request_timeout)
+        base_urls = [value.strip() for value in base_url.split(",") if value.strip()]
+        if not base_urls:
+            raise ValueError("At least one vLLM base URL is required")
+        self.clients = [
+            OpenAI(base_url=value, api_key=api_key, timeout=request_timeout)
+            for value in base_urls
+        ]
+        self.client = self.clients[0]
+        self._client_index = 0
+        self._client_lock = threading.Lock()
         self.max_tokens = max_tokens
         self.retries = retries
+
+    def _next_client(self) -> OpenAI:
+        with self._client_lock:
+            client = self.clients[self._client_index]
+            self._client_index = (self._client_index + 1) % len(self.clients)
+        return client
 
     def extract(self, text: str) -> dict[str, Any]:
         if not text.strip():
@@ -93,7 +109,7 @@ class VLLMStructuredExtractor:
         last_error: Exception | None = None
         for attempt in range(self.retries):
             try:
-                response = self.client.chat.completions.create(
+                response = self._next_client().chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": SYSTEM_PROMPT},

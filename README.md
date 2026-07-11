@@ -80,9 +80,13 @@ extract-structured \
 ```
 
 The default server is `http://127.0.0.1:8000/v1`. Override it with
-`--base-url`. Each successful output line contains the input metadata plus an
-`extraction` object. Failed records contain an `error` and can be retried by
-rerunning with `--resume` (the default).
+`--base-url`. To load balance across independent vLLM replicas, provide a
+comma-separated list such as
+`--base-url http://127.0.0.1:8000/v1,http://127.0.0.1:8001/v1`. Requests are
+assigned round-robin while one process remains responsible for safe output
+writing and resume handling. Each successful output line contains the input
+metadata plus an `extraction` object. Failed records contain an `error` and can
+be retried by rerunning with `--resume` (the default).
 
 The pipeline sends the JSON Schema to vLLM as a strict structured-output
 constraint and validates every response again with `jsonschema`. Schema-level
@@ -108,8 +112,9 @@ scripts/run_nephrology_embeddings.sh
 ```
 
 For both structured datasets on two GPUs, one command starts a MedGemma server
-on each GPU, waits for both health checks, runs the two extractions concurrently,
-and stops both servers when finished:
+on each GPU, waits for both health checks, and distributes each dataset across
+both replicas with 16 total workers. Datasets run sequentially so neither GPU
+becomes idle when one source finishes earlier. Both servers stop when finished:
 
 ```bash
 PYTHON_BIN="$CONDA_PREFIX/bin/python" scripts/run_all_structured_two_gpus.sh
