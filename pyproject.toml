@@ -15,8 +15,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-embeddings = ["torch>=2.2", "transformers>=4.45"]
-dev = ["pytest>=8"]
+embeddings = ["torch>=2.2", "transformers>=4.50,<5"]
+dev = ["pytest>=8,<9"]
 
 [project.scripts]
 extract-structured = "text_extraction.structured:main"

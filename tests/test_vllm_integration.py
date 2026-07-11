@@ -15,7 +15,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-MODEL = os.getenv("VLLM_MODEL", "openai/gpt-oss-20b")
+MODEL = os.getenv("VLLM_MODEL", "google/medgemma-27b-text-it")
 BASE_URL = os.getenv("VLLM_BASE_URL", "http://127.0.0.1:8000/v1")
 
 

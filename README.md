@@ -23,19 +23,28 @@ pip install -e .
 managed in a separate environment, install this package with
 `pip install -e '.[embeddings]'` in the client environment instead.
 
-## Start vLLM on one GPU
+## Model access
+
+Structured extraction defaults to `google/medgemma-27b-text-it`. Before the
+first run, log in to Hugging Face and accept Google's Health AI Developer
+Foundations terms on the model page:
+
+<https://huggingface.co/google/medgemma-27b-text-it>
+
+Model weights are downloaded to the Hugging Face cache, never to this
+repository.
+
+## Start MedGemma on one GPU
 
 Run the server in its own terminal:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 vllm serve openai/gpt-oss-20b \
-  --served-model-name openai/gpt-oss-20b \
-  --host 127.0.0.1 \
-  --port 8000 \
-  --tensor-parallel-size 1 \
-  --max-model-len 16384 \
-  --gpu-memory-utilization 0.80
+GPU=0 PORT=8000 scripts/serve_medgemma.sh
 ```
+
+The launcher uses one GPU, a 32K context window, deterministic vLLM generation
+defaults, and XGrammar JSON constraints with unrestricted whitespace disabled.
+The last setting is required to prevent constrained-generation whitespace loops.
 
 Confirm it is ready:
 
@@ -44,17 +53,12 @@ curl http://127.0.0.1:8000/health
 curl http://127.0.0.1:8000/v1/models
 ```
 
-On HiPerGator, an error mentioning `CXXABI_1.3.15` means the server selected
-the system C++ runtime. Scope the active conda environment's runtime to the
-vLLM command:
+On HiPerGator, activate the intended environment before launching. If an error
+mentions `CXXABI_1.3.15`, provide its Python and C++ runtime explicitly:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH="$CONDA_PREFIX/lib" \
-  vllm serve openai/gpt-oss-20b \
-  --served-model-name openai/gpt-oss-20b \
-  --tensor-parallel-size 1 \
-  --max-model-len 16384 \
-  --gpu-memory-utilization 0.80
+PYTHON_BIN="$CONDA_PREFIX/bin/python" GPU=0 PORT=8000 \
+  scripts/serve_medgemma.sh
 ```
 
 ## 1. Structured JSON extraction
@@ -71,7 +75,7 @@ extract-structured \
   --input notes.jsonl \
   --output outputs/discharge.jsonl \
   --schema schemas/discharge_renal.json \
-  --model openai/gpt-oss-20b \
+  --model google/medgemma-27b-text-it \
   --workers 8
 ```
 
@@ -103,11 +107,34 @@ scripts/run_discharge_embeddings.sh
 scripts/run_nephrology_embeddings.sh
 ```
 
+For both structured datasets on two GPUs, one command starts a MedGemma server
+on each GPU, waits for both health checks, runs the two extractions concurrently,
+and stops both servers when finished:
+
+```bash
+PYTHON_BIN="$CONDA_PREFIX/bin/python" scripts/run_all_structured_two_gpus.sh
+```
+
+The durable results are:
+
+- `outputs/discharge_structured.jsonl`
+- `outputs/nephrology_structured.jsonl`
+- `outputs/logs/medgemma_gpu0.log`
+- `outputs/logs/medgemma_gpu1.log`
+
+All are excluded by `.gitignore`. Rerunning resumes successful records and
+retries failed records. Pass `--no-resume` only when intentionally replacing an
+existing extraction.
+
 Use `--limit` for a smoke test before a full run:
 
 ```bash
 scripts/run_discharge_structured.sh --limit 2 --no-resume
 scripts/run_nephrology_embeddings.sh --limit 2
+
+# Two-GPU structured smoke run (two records from each source)
+PYTHON_BIN="$CONDA_PREFIX/bin/python" \
+  scripts/run_all_structured_two_gpus.sh --limit 2 --no-resume
 ```
 
 Configuration is available through environment variables without editing a
@@ -188,11 +215,17 @@ The structured pipeline has been exercised end to end with:
 
 - one NVIDIA B200 GPU
 - `vllm==0.19.0`
-- `openai/gpt-oss-20b`
+- `google/medgemma-27b-text-it`
 - strict JSON-schema output for both included schemas
-- concurrent requests (`--workers 2` and `--workers 3`)
+- concurrent requests (`--workers 8`)
 - dense extraction with cached `emilyalsentzer/Bio_ClinicalBERT` (three notes,
   768 dimensions, finite unit-normalized float32 vectors)
+
+On 25 discharge and 25 nephrology reports, MedGemma returned 50/50 valid
+schema-conforming records. Extraction took 7.02 seconds for discharge and
+14.86 seconds for nephrology after server startup. The comparison model,
+`google/gemma-4-31B-it`, also returned 50/50 valid records and took 8.39 and
+17.61 seconds respectively on the same one-B200 setup.
 
 This verifies server startup, OpenAI-compatible requests, constrained decoding,
 JSON parsing, schema validation, concurrent output writing, and both clinical

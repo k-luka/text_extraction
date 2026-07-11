@@ -5,7 +5,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 PYTHON_BIN=${PYTHON_BIN:-python}
 INPUT=${INPUT:-/orange/pinaki.sarder/singletarya/mmai/text_fe/discharge_summaries.csv}
 OUTPUT=${OUTPUT:-$ROOT/outputs/discharge_structured.jsonl}
-MODEL=${MODEL:-openai/gpt-oss-20b}
+MODEL=${MODEL:-google/medgemma-27b-text-it}
 BASE_URL=${BASE_URL:-http://127.0.0.1:8000/v1}
 WORKERS=${WORKERS:-8}
 
@@ -22,4 +22,3 @@ exec "$PYTHON_BIN" -m text_extraction.structured \
   --base-url "$BASE_URL" \
   --workers "$WORKERS" \
   "$@"
-
