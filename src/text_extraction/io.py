@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import csv
+import sys
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
@@ -25,6 +26,7 @@ def iter_records(
     with source.open(encoding="utf-8-sig", errors="replace", newline="") as handle:
         rows: Iterable[dict[str, Any]]
         if resolved_format == "csv":
+            csv.field_size_limit(sys.maxsize)
             rows = csv.DictReader(handle)
         else:
             rows = _iter_jsonl_handle(handle)

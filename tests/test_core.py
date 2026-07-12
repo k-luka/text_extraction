@@ -34,6 +34,14 @@ def test_csv_streaming_and_limit(tmp_path):
     assert rows == [{"note_id": "1", "NOTE_TEXT": "first"}]
 
 
+def test_csv_reader_accepts_large_clinical_notes(tmp_path):
+    path = tmp_path / "large.csv"
+    long_note = "x" * 200_000
+    path.write_text(f"note_id,NOTE_TEXT\n1,{long_note}\n", encoding="utf-8")
+    rows = list(iter_records(path, input_format="csv"))
+    assert rows[0]["NOTE_TEXT"] == long_note
+
+
 def test_example_schema_is_valid():
     schema = load_schema("schemas/discharge_renal.json")
     assert schema["additionalProperties"] is False
