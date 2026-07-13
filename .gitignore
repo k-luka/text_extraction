@@ -1,10 +1,44 @@
+# Python and test caches
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Environments and packaging
+.env
+.env.*
 .venv/
+venv/
 dist/
 build/
 *.egg-info/
+
+# Clinical data and generated artifacts
 outputs/
+results/
+data/
+logs/
+*.csv
+*.tsv
+*.parquet
+*.jsonl
+*.npz
 *.log
 
+# Model weights and local caches
+.cache/
+*.bin
+*.ckpt
+*.gguf
+*.pt
+*.pth
+*.safetensors
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp

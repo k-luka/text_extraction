@@ -9,12 +9,13 @@ description = "Schema-guided medical text extraction with vLLM and dense text em
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "jsonschema>=4.21",
-  "numpy>=1.26",
-  "openai>=1.30",
+  "jsonschema>=4.21,<5",
+  "numpy>=1.26,<3",
+  "openai>=1.30,<3",
 ]
 
 [project.optional-dependencies]
+server = ["vllm>=0.19,<0.20"]
 embeddings = ["torch>=2.2", "transformers>=4.50,<5"]
 dev = ["pytest>=8,<9"]
 

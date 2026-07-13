@@ -1,14 +1,11 @@
 # Medical text extraction
 
-Two small, independent inference pipelines:
+Two independent inference pipelines:
 
 1. **Structured extraction:** clinical text → schema-validated JSONL through an
    OpenAI-compatible vLLM server.
 2. **Dense embeddings:** clinical text → NumPy vectors through a Hugging Face
    encoder or base transformer model.
-
-This repository deliberately contains no Ollama integration, prediction models,
-XGBoost, regression, EHR fusion, clustering, or report-specific batch classes.
 
 ## Install
 
@@ -20,8 +17,15 @@ pip install -e .
 ```
 
 `requirements.txt` installs both pipeline runtimes and vLLM. If vLLM is
-managed in a separate environment, install this package with
-`pip install -e '.[embeddings]'` in the client environment instead.
+managed in a separate environment, install only the components needed by the
+current environment:
+
+```bash
+pip install -e .                 # structured-extraction client
+pip install -e '.[server]'       # client plus local vLLM server
+pip install -e '.[embeddings]'   # client plus embedding runtime
+pip install -e '.[dev]'          # unit-test dependencies
+```
 
 ## Model access
 
@@ -131,6 +135,9 @@ All are excluded by `.gitignore`. Rerunning resumes successful records and
 retries failed records. Pass `--no-resume` only when intentionally replacing an
 existing extraction.
 
+Generated results and logs exist only on the machine that ran extraction. They
+are not included when this repository is cloned or shared through GitHub.
+
 Use `--limit` for a smoke test before a full run:
 
 ```bash
@@ -201,6 +208,16 @@ Both commands read local JSONL and write local artifacts. They do not send data
 anywhere except the vLLM endpoint you configure. Do not commit patient text,
 outputs, credentials, or model-cache files.
 
+## Repository layout
+
+```text
+schemas/                  JSON Schemas and clinical extraction rules
+scripts/                  Reproducible dataset and vLLM launchers
+src/text_extraction/      Structured-extraction and embedding packages
+tests/                    Unit and opt-in vLLM integration tests
+outputs/                  Local results and logs (generated, Git-ignored)
+```
+
 ## Lightweight checks
 
 ```bash
@@ -218,11 +235,11 @@ RUN_VLLM_INTEGRATION=1 pytest -q tests/test_vllm_integration.py
 
 The structured pipeline has been exercised end to end with:
 
-- one NVIDIA B200 GPU
+- one- and two-replica NVIDIA B200 configurations
 - `vllm==0.19.0`
 - `google/medgemma-27b-text-it`
 - strict JSON-schema output for both included schemas
-- concurrent requests (`--workers 8`)
+- concurrent requests (`--workers 8` per replica)
 - dense extraction with cached `emilyalsentzer/Bio_ClinicalBERT` (three notes,
   768 dimensions, finite unit-normalized float32 vectors)
 
